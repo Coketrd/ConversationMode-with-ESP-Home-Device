@@ -375,7 +375,46 @@ action:
     domain: switch
 mode: single
 ```
-9. So that you can see when listening is active again and you know when you can speak again, we need some kind of indicator, which could be a light, a beep or something else. For example, I used the light from a socket for this.
+9. So that you can see when listening is active again and you know when you can speak again, we need some kind of indicator, which could be a light, a beep or something else. For example, I used the light from a socket for this. here is my automation example
+
+```
+alias: Socket light control with Jarvis mic
+description: ""
+trigger:
+  - platform: state
+    entity_id:
+      - binary_sensor.voice_assist_mic_assist_in_verwendung
+    to: "on"
+    id: zuhören an
+  - platform: state
+    entity_id:
+      - binary_sensor.voice_assist_mic_assist_in_verwendung
+    to: "off"
+    id: zuhören aus
+condition: []
+action:
+  - if:
+      - condition: trigger
+        id:
+          - zuhören an
+    then:
+      - action: select.select_option
+        target:
+          entity_id: select.schreibtisch_steckdosenleiste_hintergrundbeleuchtungsmodus
+        data:
+          option: LightWhenOn
+  - if:
+      - condition: trigger
+        id:
+          - zuhören aus
+    then:
+      - action: select.select_option
+        target:
+          entity_id: select.schreibtisch_steckdosenleiste_hintergrundbeleuchtungsmodus
+        data:
+          option: "Off"
+mode: single
+```
 
 If anyone knows how to control the light ring of the EchoDot and use it for this purpose, I would be grateful for the code. I haven't found anything about it.
    
