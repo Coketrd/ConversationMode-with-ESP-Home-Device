@@ -1,6 +1,8 @@
 # NoWakeWord_DoAConversation
 Do a Conversation with youre HomeAssistant-Assist without needing a WakeWord the hole time.
 
+This is not a finished integration. The result is achieved using various scripts and helpers. I give no guarantee that this variant will work for you. Everyone is responsible for checking the code and any damage it may cause.
+
 First of all, I would like to tell you about my setup. It may be that this also works with other systems, but I have the following setup:
 
 - An ESP32 with an INMP441 microphone
@@ -224,10 +226,16 @@ switch:
 
 ```
 
-2. We need to create a helper in which we save the URL.
-   i Useing an Input Text Helper:   input_text.url_esp32_voice_assist
+2. We need to create helper:
+   - in which we save the URL.
+     i Useing an Input Text Helper:   input_text.url_esp32_voice_assist
+   - in which we save the timer
+     i Using an timer Helper:   timer.extract_mp3_time
+   - with which we activate continuous listening. Only when this helper is active are the mp3 files analyzed and the microphone reactivated at the end of the voice output. You can activate this helper directly via the voice assistant by saying: activate continuous listening when you first enter your voice. Or you can link the assistant to a switch on a wall or simply
+     activate and deactivate it via smartphone/tablet/watch.
+     This is my helper: input_boolean.voice_assistant_permanent_listening_active
 
-3. We need to create a script to save the URL in the helper
+4. We need to create a script to save the URL in the helper
 
 ```
 alias: ha_voice_alexa_url
@@ -240,8 +248,132 @@ sequence:
 mode: single
 description: ""
 ```
-4. Now you need to install the integration pyscript from HACS https://github.com/custom-components/pyscript and set:
+5. Now you need to install the integration pyscript from HACS https://github.com/custom-components/pyscript and set:
    - Allow all imports? YES.
-   - Use Home Assistant as a global variable?Use Home Assistant as a global variable? YES
+   - Use Home Assistant as a global variable? YES
+
+6. Make a new pyscript with the code:
+```
+@service
+async def download_and_get_duration(mp3_url=None):
+    import aiohttp
+    import io
+    import os
+    from mutagen.mp3 import MP3
+
+    output_path = "/config/pyscript/test_download2.mp3"
+
+    async def debug_print(message):
+        print(message)  # Use print for protocol output
+
+    if not mp3_url:
+        debug_print("No MP3 URL provided.")
+        return
+
+    try:
+        # Download the MP3 file
+        async with aiohttp.ClientSession() as session:
+            async with session.get(mp3_url) as response:
+                if response.status == 200:
+                    debug_print("File downloaded successfully.")
+                    content = response.read()  # Read the data from the answer
+
+                    # Write the file to the hard disk
+                    with io.open(output_path, 'wb') as f:
+                        f.write(content)
+
+                    # Check whether the file has been saved
+                    if os.path.exists(output_path):
+                        debug_print(f"Temporary file was successfully saved under {output_path}.")
+                    else:
+                        debug_print(f"Temporary file was not found under {output_path}.")
+                        return
+
+                    # Read out the duration of the MP3 file
+                    try:
+                        audio = MP3(output_path)
+                        duration_seconds = audio.info.length
+                        debug_print(f"The duration of the MP3 file is {duration_seconds} seconds.")
+
+                        # Add additional seconds based on the length
+                        if duration_seconds < 10:
+                            duration_seconds += 4
+                        elif 10 <= duration_seconds < 20:
+                            duration_seconds += 6
+                        elif 20 <= duration_seconds < 30:
+                            duration_seconds += 8
+
+                        debug_print(f"The adjusted duration is {duration_seconds} seconds.")
+
+                        # Setting the duration in the timer
+                        service.call("timer", "start", entity_id="timer.extract_mp3_time", duration=duration_seconds)
+                    except Exception as e:
+                        debug_print(f"Error when reading out the MP3 duration: {e}")
+                else:
+                    debug_print(f"Error downloading the file. Status code: {response.status}")
+    except Exception as e:
+        debug_print(f"Fehler im Skript: {e}")
+```
+
+7. Now we need an automation to activate the automatic listening
+   
+```
+alias: Activate continuous listening.
+description: ""
+trigger:
+  - platform: state
+    entity_id:
+      - input_text.url_esp32_voice_assist
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 0
+condition:
+  - condition: state
+    entity_id: input_boolean.voice_assistant_permanent_listening_active
+    state: "on"
+    enabled: true
+action:
+  - data:
+      mp3_url: "{{ states('input_text.url_esp32_voice_assist') }}"
+    action: pyscript.download_and_get_duration
+  - wait_for_trigger:
+      - platform: state
+        entity_id:
+          - timer.extract_mp3_time
+        to: idle
+  - type: turn_on
+    device_id: #YOURE DEVICE ID. FOR EXAMPLE esp32-microphone-assist
+    entity_id: #YOure SWITCH for listening on ESP. FOR EXAMPLE: Listen Once
+    domain: switch
+    enabled: true
+mode: single
+```
+8. We need a second automation to reset the listen once switch from the esp. This ensures that the wakeword is active again for further entries until the end of the next voice output.
+
+```
+alias: Listen-Once-ESP32-Assist deaktivieren
+description: ""
+trigger:
+  - platform: device
+    type: turned_on
+    device_id: #YOURE DEVICE ID. FOR EXAMPLE esp32-microphone-assist
+    entity_id: #YOure SWITCH for listening on ESP. FOR EXAMPLE: Listen Once
+    domain: switch
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 3
+condition: []
+action:
+  - type: turn_off
+    device_id: #YOURE DEVICE ID. FOR EXAMPLE esp32-microphone-assist
+    entity_id: #YOure SWITCH for listening on ESP. FOR EXAMPLE: Listen Once
+    domain: switch
+mode: single
+```
+9. So that you can see when listening is active again and you know when you can speak again, we need some kind of indicator, which could be a light, a beep or something else. For example, I used the light from a socket for this.
+
+If anyone knows how to control the light ring of the EchoDot and use it for this purpose, I would be grateful for the code. I haven't found anything about it.
    
 
