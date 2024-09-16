@@ -376,4 +376,5 @@ mode: single
 
 If anyone knows how to control the light ring of the EchoDot and use it for this purpose, I would be grateful for the code. I haven't found anything about it.
    
-
+Here you can see the result:
+https://youtu.be/cqC0aW5u_oM 
