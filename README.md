@@ -1,6 +1,9 @@
 # NoWakeWord_DoAConversation
 Do a Conversation with youre HomeAssistant-Assist without needing a WakeWord the hole time.
 
+The result will be that you can have a much more normal conversation with the voice assistant than before when you had to use the wakeword again and again. 
+You can activate and deactivate permanent listening. So you always have the choice between I always want the wakeword now or I only want it once because I want to have a conversation.
+
 This is not a finished integration. The result is achieved using various scripts and helpers. I give no guarantee that this variant will work for you. Everyone is responsible for checking the code and any damage it may cause.
 
 First of all, I would like to tell you about my setup. It may be that this also works with other systems, but I have the following setup:
